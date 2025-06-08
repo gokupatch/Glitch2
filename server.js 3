@@ -1,0 +1,95 @@
+
+const express = require('express');
+const multer = require('multer');
+const fs = require('fs');
+const rateLimit = require('express-rate-limit');
+const expressBasicAuth = require('express-basic-auth');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware to parse JSON in requests
+app.use(express.json());
+
+// Serve static files from the "public" folder
+app.use(express.static('public'));
+
+// Public route for the homepage
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html'); // Serve the homepage
+});
+
+// Basic Authentication middleware (for protected routes)
+const requireAuth = expressBasicAuth({
+  users: { admin: 'password123' }, // Replace with your username and password
+  challenge: true,
+  unauthorizedResponse: 'Unauthorized',
+});
+
+// Rate Limiting middleware (for protected routes)
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit to 10 requests per IP
+  message: 'Too many upload attempts, please try again later.',
+});
+
+// Multer setup for handling file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/';
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir); // Create folder if it doesn't exist
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5 MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/webp', 'image/png'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error('Invalid file type. Only JPEG and PNG are allowed.'));
+    }
+    cb(null, true);
+  },
+});
+
+// Serve the upload page (GET /upload)
+app.get('/upload', requireAuth, (req, res) => {
+  res.sendFile(__dirname + '/public/upload.html'); // Serve the upload form
+});
+
+// Protected route for uploading files
+app.post('/upload', requireAuth, uploadLimiter, upload.array('images', 10), async (req, res) => {
+  try {
+    const files = req.files.map((file) => ({
+      filename: file.filename,
+      path: file.path,
+    }));
+    res.redirect('/'); // Redirect to homepage after upload
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Public route to fetch uploaded images
+app.get('/images', (req, res) => {
+  const uploadDir = 'uploads/';
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      return res.status(500).json({ message: 'Failed to load images' });
+    }
+    res.json(files.map((file) => `/uploads/${file}`)); // Return URLs for uploaded images
+  });
+});
+
+// Serve uploaded images publicly
+app.use('/uploads', express.static('uploads'));
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
