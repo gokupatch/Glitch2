@@ -1,0 +1,134 @@
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const rateLimit = require('express-rate-limit');
+const expressBasicAuth = require('express-basic-auth');
+const nodemailer = require('nodemailer');
+require('dotenv').config(); // Load environment variables from .env file
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.set('trust proxy', 1); // Trust the reverse proxy
+
+// Middleware to parse JSON and serve static files
+app.use(express.json());
+app.use(express.static('public')); // Serve static files (HTML, CSS)
+
+// Basic Authentication for Protected Routes
+const requireAuth = expressBasicAuth({
+  users: { admin: process.env.ADMIN_PASSWORD }, // Replace with your credentials in .env
+  challenge: true,
+  unauthorizedResponse: 'Unauthorized',
+});
+
+// Rate Limiting for Uploads
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: 'Too many upload attempts, please try again later.',
+});
+
+// Multer setup for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir);
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.'));
+    }
+    cb(null, true);
+  },
+});
+
+// Serve the upload page
+app.get('/upload', requireAuth, (req, res) => {
+  res.sendFile(__dirname + '/public/upload.html'); // Serve the Multi-Image Watermark Tool
+});
+
+// Handle uploads from the watermarking tool
+app.post('/upload', requireAuth, uploadLimiter, upload.array('images', 10), (req, res) => {
+  try {
+    const files = req.files.map((file) => ({
+      filename: file.filename,
+      path: file.path,
+    }));
+
+    res.json({ message: 'Files uploaded successfully', files });
+  } catch (error) {
+    res.status(500).json({ message: 'File upload failed', error: error.message });
+  }
+});
+
+// Email endpoint to send unwatermarked images
+app.post('/send-email', async (req, res) => {
+  const { email, imagePaths } = req.body;
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'Gmail',
+      auth: {
+        user: process.env.EMAIL_USER, // Use email from .env file
+        pass: process.env.EMAIL_PASS, // Use email password from .env file
+      },
+    });
+
+    const attachments = imagePaths.map((filePath) => ({
+      filename: path.basename(filePath),
+      path: filePath,
+    }));
+
+    await transporter.sendMail({
+      from: `"Your Gallery" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your Purchased Images',
+      text: 'Thank you for your purchase! Attached are your unwatermarked images.',
+      attachments,
+    });
+
+    res.json({ message: 'Email sent successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to send email', details: err.message });
+  }
+});
+
+// Public route for homepage
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
+// Route to fetch uploaded images
+app.get('/images', (req, res) => {
+  const uploadDir = 'uploads/';
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      return res.status(500).json({ message: 'Failed to load images' });
+    }
+    res.json(
+      files.map((file) => `/uploads/${file}`)
+    );
+  });
+});
+
+// Serve uploaded images publicly
+app.use('/uploads', express.static('uploads'));
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});

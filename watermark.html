@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Image Watermark Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        .image-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .image-container {
+            position: relative;
+            display: inline-block;
+            text-align: center;
+        }
+        .image-container canvas {
+            max-width: 200px;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Multi-Image Watermark Tool</h1>
+    <div class="controls">
+        <label for="imageInput">Select Images:</label>
+        <input type="file" id="imageInput" accept="image/*" multiple><br><br>
+
+        <label for="watermarkText">Watermark Text:</label>
+        <input type="text" id="watermarkText" placeholder="Enter watermark text"><br><br>
+
+        <label for="fontSize">Font Size:</label>
+        <input type="number" id="fontSize" value="20"><br><br>
+
+        <label for="fontFamily">Font:</label>
+        <select id="fontFamily">
+            <option value="Arial" selected>Arial</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Georgia">Georgia</option>
+        </select><br><br>
+
+        <label for="opacity">Opacity:</label>
+        <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="0.5"><br><br>
+
+        <label for="angle">Angle (degrees):</label>
+        <input type="number" id="angle" value="0"><br><br>
+
+        <label for="repeat">Repeat Watermark:</label>
+        <input type="checkbox" id="repeat"><br><br>
+
+        <button id="uploadToDrive">Upload to Google Drive</button>
+        <button id="uploadToGitHub">Upload to GitHub</button>
+        <button id="downloadAllButton">Download All Watermarked Images</button>
+    </div>
+    <div class="image-grid" id="imageGrid"></div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const watermarkText = document.getElementById('watermarkText');
+        const fontSize = document.getElementById('fontSize');
+        const fontFamily = document.getElementById('fontFamily');
+        const opacity = document.getElementById('opacity');
+        const angle = document.getElementById('angle');
+        const repeat = document.getElementById('repeat');
+        const downloadAllButton = document.getElementById('downloadAllButton');
+        const uploadToDrive = document.getElementById('uploadToDrive');
+        const uploadToGitHub = document.getElementById('uploadToGitHub');
+        const imageGrid = document.getElementById('imageGrid');
+
+        let images = [];
+
+        imageInput.addEventListener('change', processImages);
+        watermarkText.addEventListener('input', updateWatermarks);
+        fontSize.addEventListener('input', updateWatermarks);
+        fontFamily.addEventListener('input', updateWatermarks);
+        opacity.addEventListener('input', updateWatermarks);
+        angle.addEventListener('input', updateWatermarks);
+        repeat.addEventListener('change', updateWatermarks);
+        downloadAllButton.addEventListener('click', downloadAllImages);
+        uploadToDrive.addEventListener('click', () => alert('Upload to Google Drive coming soon!'));
+        uploadToGitHub.addEventListener('click', () => alert('Upload to GitHub coming soon!'));
+
+        function processImages(event) {
+            images = [];
+            imageGrid.innerHTML = ''; // Clear previous images
+            const files = Array.from(event.target.files);
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const baseImage = new Image();
+                    baseImage.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = baseImage.width;
+                        canvas.height = baseImage.height;
+                        ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
+                        images.push({ baseImage, canvas });
+                        drawWatermark(canvas, baseImage);
+                        const container = document.createElement('div');
+                        container.classList.add('image-container');
+                        container.appendChild(canvas);
+                        imageGrid.appendChild(container);
+                    };
+                    baseImage.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function drawWatermark(canvas, baseImage) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = parseFloat(opacity.value);
+            ctx.font = `${fontSize.value}px ${fontFamily.value}`;
+            const text = watermarkText.value + '      '; // Add 6 spaces to text
+
+            if (repeat.checked) {
+                drawRepeatedWatermark(ctx, text, canvas.width, canvas.height);
+            } else {
+                drawSingleWatermark(ctx, text, canvas.width / 2, canvas.height / 2);
+            }
+        }
+
+        function drawRepeatedWatermark(ctx, text, canvasWidth, canvasHeight) {
+            const textWidth = ctx.measureText(text).width + 20;
+            const lineHeight = parseFloat(fontSize.value) + 10;
+            let offset = 0;
+
+            for (let y = 0; y < canvasHeight; y += lineHeight) {
+                for (let x = -offset; x < canvasWidth + textWidth; x += textWidth) {
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.rotate((parseFloat(angle.value) * Math.PI) / 180);
+                    ctx.fillText(text, 0, 0);
+                    ctx.restore();
+                }
+                offset = (offset + textWidth / 2) % textWidth;
+            }
+        }
+
+        function drawSingleWatermark(ctx, text, x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate((parseFloat(angle.value) * Math.PI) / 180);
+            ctx.fillText(text, 0, 0);
+            ctx.restore();
+        }
+
+        function updateWatermarks() {
+            images.forEach(({ baseImage, canvas }) => {
+                drawWatermark(canvas, baseImage);
+            });
+        }
+
+        function downloadAllImages() {
+            images.forEach(({ canvas }, index) => {
+                const link = document.createElement('a');
+                link.download = `watermarked_image_${index + 1}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Basket</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+        }
+        .basket {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4 columns */
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .basket img {
+            width: 100%;
+            border-radius: 10px;
+        }
+        .basket-item {
+            text-align: center;
+        }
+        .basket-item button {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #d9534f;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .basket-item button:hover {
+            background-color: #c9302c;
+        }
+        #totalCost {
+            text-align: center;
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
+        #checkout {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.2em;
+            width: 150px;
+        }
+        #checkout:hover {
+            background-color: #4cae4c;
+        }
+    </style>
+</head>
+<body>
+    <h1>Your Basket</h1>
+    <div class="basket" id="basketContainer"></div>
+    <div id="totalCost">Total: £0</div>
+    <a href="#" id="checkout">Checkout</a>
+
+    <script>
+        const basket = JSON.parse(localStorage.getItem('basket')) || [];
+        const basketContainer = document.getElementById('basketContainer');
+        const totalCostElement = document.getElementById('totalCost');
+
+        // Display basket items
+        function renderBasket() {
+            basketContainer.innerHTML = ''; // Clear current content
+
+            if (basket.length === 0) {
+                basketContainer.innerHTML = '<p>Your basket is empty.</p>';
+                totalCostElement.textContent = 'Total: £0';
+                return;
+            }
+
+            basket.forEach((image, index) => {
+                const item = document.createElement('div');
+                item.classList.add('basket-item');
+
+                const img = document.createElement('img');
+                img.src = image;
+                img.alt = 'Watermarked Image';
+
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove';
+                removeButton.onclick = () => removeFromBasket(index);
+
+                item.appendChild(img);
+                item.appendChild(removeButton);
+                basketContainer.appendChild(item);
+            });
+
+            updateTotalCost();
+        }
+
+        // Remove an item from the basket
+        function removeFromBasket(index) {
+            basket.splice(index, 1); // Remove item from basket
+            localStorage.setItem('basket', JSON.stringify(basket)); // Update local storage
+            renderBasket(); // Re-render basket
+        }
+
+        // Calculate the total cost based on the pricing rules
+        function calculateTotalCost() {
+            const count = basket.length;
+
+            if (count === 0) return 0;
+            if (count === 1) return 10;
+
+            // Calculate cost: £15 for every pair, £10 for leftover image
+            const pairs = Math.floor(count / 2);
+            const leftover = count % 2;
+            return pairs * 15 + leftover * 10;
+        }
+
+        // Update the total cost display
+        function updateTotalCost() {
+            const totalCost = calculateTotalCost();
+            totalCostElement.textContent = `Total: £${totalCost}`;
+        }
+
+        // Initial render
+        renderBasket();
+    </script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Gallery</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    #gallery {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    #gallery img {
+      width: 200px;
+      border: 2px solid #ccc;
+      border-radius: 5px;
+      transition: transform 0.2s;
+    }
+    #gallery img:hover {
+      transform: scale(1.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to the Image Gallery</h1>
+  <div id="gallery"></div>
+  <script>
+    // Fetch uploaded images and display them in the gallery
+    fetch('/images')
+      .then((response) => response.json())
+      .then((images) => {
+        const gallery = document.getElementById('gallery');
+        images.forEach((image) => {
+          const img = document.createElement('img');
+          img.src = image; // Set image source
+          gallery.appendChild(img);
+        });
+      })
+      .catch((err) => {
+        console.error('Error loading images:', err);
+      });
+  </script>
+</body>
+</html>
