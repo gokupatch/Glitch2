@@ -1,112 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Gallery</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            text-align: center;
-        }
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr); /* 6 columns */
-            gap: 20px; /* Spacing between images */
-            margin: 20px 0;
-        }
-        .gallery img {
-            width: 100%;
-            border-radius: 10px;
-            cursor: pointer;
-            object-fit: contain;
-        }
-        .gallery button {
-            display: block;
-            margin: 10px auto;
-            padding: 10px 15px;
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .gallery button:hover {
-            background-color: #0056b3;
-        }
-
-        .basket-link {
-            display: block;
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 1.2em;
-            text-decoration: none;
-            color: #007bff;
-        }
-        .basket-link:hover {
-            color: #0056b3;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Image Gallery</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+    }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .gallery img {
+      width: 100%;
+      border-radius: 10px;
+      cursor: pointer;
+      object-fit: contain;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+    .gallery img:hover {
+      transform: scale(1.05);
+    }
+  </style>
 </head>
 <body>
-    <a href="basket.html" class="basket-link">Go to Basket</a>
-    <h1>Image Gallery</h1>
-    <div class="gallery"></div>
+  <h1>Image Gallery</h1>
+  <div class="gallery">Loading images...</div>
 
-    <script>
-        // Fetch and display images in the gallery
-        window.onload = async () => {
-            try {
-                const response = await fetch('/images');
-                const images = await response.json();
+  <script>
+    window.onload = async () => {
+      const gallery = document.querySelector('.gallery');
+      try {
+        const response = await fetch('https://gallery.gokupatch.workers.dev/');
+        if (!response.ok) throw new Error('Network response was not ok');
+        const images = await response.json();
 
-                const gallery = document.querySelector('.gallery');
-                gallery.innerHTML = ''; // Clear existing content
+        gallery.innerHTML = ''; // Clear loading text
 
-                if (!images || images.length === 0) {
-                    gallery.innerHTML = '<p>No images found.</p>';
-                    return;
-                }
-
-                // Add latest uploads at the top
-                images.reverse().forEach((image) => {
-                    if (!image || !image.trim()) return; // Skip invalid or empty image URLs
-
-                    const container = document.createElement('div');
-                    const img = document.createElement('img');
-                    img.src = image;
-                    img.alt = 'Watermarked Image';
-
-                    const button = document.createElement('button');
-                    button.textContent = 'Add to Basket';
-                    button.onclick = () => addToBasket(image);
-
-                    container.appendChild(img);
-                    container.appendChild(button);
-                    gallery.appendChild(container);
-                });
-            } catch (error) {
-                console.error('Error fetching images:', error); // Log fetch errors
-            }
-        };
-
-        // Initialize basket from localStorage
-        const basket = JSON.parse(localStorage.getItem('basket')) || [];
-
-        // Add to basket
-        function addToBasket(imagePath) {
-            if (!basket.includes(imagePath)) {
-                basket.push(imagePath);
-                localStorage.setItem('basket', JSON.stringify(basket)); // Update localStorage
-                alert('Image added to basket!');
-            } else {
-                alert('This image is already in your basket.');
-            }
+        if (!images.length) {
+          gallery.innerHTML = '<p>No images found.</p>';
+          return;
         }
-    </script>
+
+        images.forEach((url) => {
+          if (!url || !url.trim()) return;
+
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = 'Gallery Image';
+
+          gallery.appendChild(img);
+        });
+      } catch (error) {
+        gallery.innerHTML = `<p>Error loading images: ${error.message}</p>`;
+        console.error('Fetch/display error:', error);
+      }
+    };
+  </script>
 </body>
 </html>
